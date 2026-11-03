@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Downloader & Cutter</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,sans-serif}
+body{background:#0f172a;color:#f8fafc;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px}
+.c{background:#1e293b;padding:28px;border-radius:12px;width:100%;max-width:520px;box-shadow:0 10px 25px rgba(0,0,0,.4)}
+h1{font-size:22px;color:#38bdf8;text-align:center;margin-bottom:6px}
+p.s{font-size:13px;color:#94a3b8;text-align:center;margin-bottom:18px}
+label{display:block;font-size:13px;margin-bottom:5px;color:#cbd5e1}
+input{width:100%;padding:12px 14px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#fff;font-size:14px;outline:none}
+input:focus{border-color:#38bdf8}
+.g{margin-bottom:14px}.r{display:flex;gap:10px}.r .g{flex:1}
+button{background:#0284c7;color:#fff;border:0;padding:12px;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;width:100%;margin-top:6px}
+button:disabled{background:#475569;cursor:not-allowed}
+.bar{height:8px;background:#0f172a;border-radius:6px;overflow:hidden;margin-top:16px;display:none}
+.bar div{height:100%;width:0;background:#38bdf8;transition:width .3s}
+#msg{margin-top:12px;font-size:13px;text-align:center;color:#cbd5e1;min-height:18px}
+#msg a{color:#34d399;font-weight:700}
+</style>
+</head>
+<body>
+<div class="c">
+  <h1>Video Cutter & Downloader</h1>
+  <p class="s">पूरा वीडियो या सिर्फ़ चुना हुआ हिस्सा, एक क्लिक में डाउनलोड</p>
+  <div class="g"><label>वीडियो लिंक</label><input id="url" placeholder="https://www.youtube.com/watch?v=..."></div>
+  <div class="r">
+    <div class="g"><label>Start (खाली = शुरू से)</label><input id="st" placeholder="01:30 या 90"></div>
+    <div class="g"><label>End (खाली = अंत तक)</label><input id="en" placeholder="05:00 या 300"></div>
+  </div>
+  <button id="btn" onclick="go()">डाउनलोड करें</button>
+  <div class="bar" id="bar"><div id="fill"></div></div>
+  <div id="msg"></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+async function go(){
+  const url=$('url').value.trim();
+  if(!url){alert('पहले वीडियो का लिंक डालें!');return}
+  $('btn').disabled=true;$('bar').style.display='block';$('fill').style.width='3%';
+  $('msg').textContent='प्रोसेस हो रहा है...';
+  try{
+    const r=await fetch('/api/process',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url,startTime:$('st').value.trim(),endTime:$('en').value.trim()})});
+    const d=await r.json();
+    if(!d.success) throw new Error(d.error||'विफल');
+    await poll(d.jobId);
+  }catch(e){$('msg').textContent='त्रुटि: '+e.message;$('bar').style.display='none'}
+  $('btn').disabled=false;
+}
+async function poll(id){
+  while(true){
+    await new Promise(r=>setTimeout(r,1500));
+    const s=await (await fetch('/api/status/'+id)).json();
+    if(s.status==='running'){$('fill').style.width=Math.max(3,s.progress)+'%';$('msg').textContent='प्रोसेस हो रहा है... '+Math.round(s.progress)+'%';continue}
+    if(s.status==='done'){
+      $('fill').style.width='100%';
+      $('msg').innerHTML='तैयार! डाउनलोड शुरू न हो तो <a href="'+s.downloadUrl+'">यहाँ क्लिक करें</a>';
+      window.location.href=s.downloadUrl;return;
+    }
+    throw new Error(s.error||'विफल');
+  }
+}
+</script>
+</body>
+</html>
